@@ -12,6 +12,7 @@ import java.util.Optional;
 
 import com.bptn.feedApp.jdbc.UserBean;
 import com.bptn.feedApp.jpa.User;
+import com.bptn.feedApp.jpa.Profile;
 
 import org.springframework.web.bind.annotation.PathVariable;
 import java.sql.Timestamp;
@@ -104,6 +105,33 @@ public class UserController {
 
         /* User goes in the body, token goes in the Authorization header. */
         return new ResponseEntity<>(user, jwtHeader, OK);
+    }
+
+    /* Protected: returns whoever owns the Bearer token on the request. */
+    @GetMapping("/get")
+    public User getUser() {
+
+        logger.debug("Getting User Data");
+
+        return this.userService.getUser();
+    }
+
+    /* Protected: only the fields present in the body are changed, nulls are left alone. */
+    @PostMapping("/update")
+    public User updateUser(@RequestBody User user) {
+
+        logger.debug("Updating User Data");
+
+        return this.userService.updateUser(user);
+    }
+
+    /* Protected: creates the profile on first call, updates the sent fields after that. */
+    @PostMapping("/update/profile")
+    public User updateUserProfile(@RequestBody Profile profile) {
+
+        logger.debug("Updating User Profile Data, Profile: {}", profile.toString());
+
+        return this.userService.updateUserProfile(profile);
     }
 
     /* /user/reset/* is in jwt.excluded.urls: the user is locked out and has no token yet. */

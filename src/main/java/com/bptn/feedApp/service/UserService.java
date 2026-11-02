@@ -23,6 +23,10 @@ import com.bptn.feedApp.provider.ResourceProvider;
 import com.bptn.feedApp.security.JwtService;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import org.springframework.http.HttpHeaders;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import org.springframework.util.StringUtils;
+import com.bptn.feedApp.jpa.Profile;
 
 @Service
 public class UserService {
@@ -144,6 +148,95 @@ public class UserService {
                to discover which emails have accounts. */
             logger.debug("Email doesn't exist, {}", emailId);
         }
+    }
+
+    /* Returns the user that owns the JWT on the current request. */
+    public User getUser() {
+
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        /* Get User from the DB. */
+        return this.userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException(String.format("Username doesn't exist, %s", username)));
+    }
+
+    /* Copies one field from the request onto the stored user, trimmed.
+       A null in the request means "leave this field alone". */
+    private void updateValue(Supplier<String> getter, Consumer<String> setter) {
+
+        Optional.ofNullable(getter.get())
+                .map(String::trim)
+                .ifPresent(setter);
+    }
+
+    /* Same idea for the password, but blank is also ignored and the value is hashed first. */
+    private void updatePassword(Supplier<String> getter, Consumer<String> setter) {
+
+        Optional.ofNullable(getter.get())
+                .filter(StringUtils::hasText)
+                .map(this.passwordEncoder::encode)
+                .ifPresent(setter);
+    }
+
+    /* user = what the client sent, currentUser = what is in the DB.
+       Method references pair each getter on one with the setter on the other. */
+    private User updateUser(User user, User currentUser) {
+
+        this.updateValue(user::getFirstName, currentUser::setFirstName);
+        this.updateValue(user::getLastName, currentUser::setLastName);
+        this.updateValue(user::getPhone, currentUser::setPhone);
+        this.updateValue(user::getEmailId, currentUser::setEmailId);
+        this.updatePassword(user::getPassword, currentUser::setPassword);
+
+        return this.userRepository.save(currentUser);
+    }
+
+    public User updateUser(User user) {
+
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        /* Validates the new email if provided. The filter skips the match when the
+           email already belongs to this same user, so re-sending your own email is fine. */
+        this.userRepository.findByEmailId(user.getEmailId())
+                .filter(u -> !u.getUsername().equals(username))
+                .ifPresent(u -> {throw new EmailExistsException(String.format("Email already exists, %s", u.getEmailId()));});
+
+        /* Get and Update User */
+        return this.userRepository.findByUsername(username)
+                .map(currentUser -> this.updateUser(user, currentUser))
+                .orElseThrow(() -> new UserNotFoundException(String.format("Username doesn't exist, %s", username)));
+    }
+
+    private User updateUserProfile(Profile profile, User user) {
+
+        Profile currentProfile = user.getProfile();
+
+        if (Optional.ofNullable(currentProfile).isPresent()) {
+            /* Profile already exists: copy over only the fields that were sent. */
+            this.updateValue(profile::getHeadline, currentProfile::setHeadline);
+            this.updateValue(profile::getBio, currentProfile::setBio);
+            this.updateValue(profile::getCity, currentProfile::setCity);
+            this.updateValue(profile::getCountry, currentProfile::setCountry);
+            this.updateValue(profile::getPicture, currentProfile::setPicture);
+        }
+        else {
+            /* First time: attach the new profile to the user on both sides of the link.
+               Cascade on the User side inserts the Profile row during save(). */
+            user.setProfile(profile);
+            profile.setUser(user);
+        }
+
+        return this.userRepository.save(user);
+    }
+
+    public User updateUserProfile(Profile profile) {
+
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        /* Get and Update User */
+        return this.userRepository.findByUsername(username)
+                .map(user -> this.updateUserProfile(profile, user))
+                .orElseThrow(() -> new UserNotFoundException(String.format("Username doesn't exist, %s", username)));
     }
 
     public void resetPassword(String password) {

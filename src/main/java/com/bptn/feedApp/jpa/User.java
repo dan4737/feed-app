@@ -11,6 +11,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.OneToOne;
 
 @Entity
 @Table(name="\"User\"")
@@ -45,6 +47,12 @@ public class User implements Serializable {
 
     @Column(name="\"createdOn\"")
     private Timestamp createdOn;
+
+    /* Other side of the link declared in Profile. mappedBy means the foreign key
+       column lives in the Profile table, not here. Cascade ALL saves or deletes
+       the profile together with the user. */
+    @OneToOne(mappedBy="user", cascade=CascadeType.ALL)
+    private Profile profile;
 
     public User() {
     }
@@ -119,6 +127,14 @@ public class User implements Serializable {
 
     public void setCreatedOn(Timestamp createdOn) {
         this.createdOn = createdOn;
+    }
+
+    public Profile getProfile() {
+        return profile;
+    }
+
+    public void setProfile(Profile profile) {
+        this.profile = profile;
     }
 
     @Override
