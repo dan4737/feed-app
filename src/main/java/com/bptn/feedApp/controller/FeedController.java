@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import com.bptn.feedApp.jpa.Feed;
+import com.bptn.feedApp.domain.PageResponse;
 
 /* Every route here is protected: /feeds is not in jwt.excluded.urls,
    so a Bearer token is required on all of them. */
@@ -42,6 +43,15 @@ public class FeedController {
         logger.debug("Getting Feed, feedId: {}", feedId);
 
         return this.feedService.getFeedById(feedId);
+    }
+
+    /* Two path segments, so /feeds/user/0/5 cannot collide with /feeds/{feedId}. */
+    @GetMapping("/user/{pageNum}/{pageSize}")
+    public PageResponse<Feed> getUserFeeds(@PathVariable int pageNum, @PathVariable int pageSize) {
+
+        logger.debug("Getting User Feeds List, pageNum: {}, pageSize: {}", pageNum, pageSize);
+
+        return this.feedService.getUserFeeds(pageNum, pageSize);
     }
 
 }
